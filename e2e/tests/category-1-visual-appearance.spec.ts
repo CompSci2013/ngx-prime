@@ -572,8 +572,8 @@ test.describe('Category 1: Visual Appearance Tests', () => {
       await popoutPage.locator('.p-paginator-page').nth(1).click();
       await popoutPage.waitForTimeout(500);
 
-      // Screenshot the pop-out window
-      await takeScreenshot(popoutPage, 'V1.8.1', 'picker-popout-page2');
+      // Screenshot the pop-out window (single image, no scrolling for pop-outs)
+      await takeOverlayScreenshot(popoutPage, 'V1.8.1', 'picker-popout-page2');
 
       // Overlay screenshot: main window showing placeholder message
       await takeOverlayScreenshot(page, 'V1.8.1', 'picker-popout-main-overlay');
@@ -603,8 +603,8 @@ test.describe('Category 1: Visual Appearance Tests', () => {
       await popoutPage.locator('.p-dropdown-panel .p-dropdown-item').filter({ hasText: /^50$/ }).click();
       await popoutPage.waitForTimeout(500);
 
-      // Screenshot the pop-out window
-      await takeScreenshot(popoutPage, 'V1.8.2', 'picker-popout-rows-50');
+      // Screenshot the pop-out window (single image, no scrolling for pop-outs)
+      await takeOverlayScreenshot(popoutPage, 'V1.8.2', 'picker-popout-rows-50');
 
       // Overlay screenshot: main window showing placeholder message
       await takeOverlayScreenshot(page, 'V1.8.2', 'picker-popout-main-overlay');
@@ -634,8 +634,8 @@ test.describe('Category 1: Visual Appearance Tests', () => {
       await popoutPage.locator('.p-dropdown-panel .p-dropdown-item').filter({ hasText: /^100$/ }).click();
       await popoutPage.waitForTimeout(500);
 
-      // Screenshot the pop-out window
-      await takeScreenshot(popoutPage, 'V1.8.3', 'picker-popout-rows-100');
+      // Screenshot the pop-out window (single image, no scrolling for pop-outs)
+      await takeOverlayScreenshot(popoutPage, 'V1.8.3', 'picker-popout-rows-100');
 
       // Overlay screenshot: main window showing placeholder message
       await takeOverlayScreenshot(page, 'V1.8.3', 'picker-popout-main-overlay');
@@ -697,14 +697,13 @@ test.describe('Category 1: Visual Appearance Tests', () => {
     test('V1.9.3 - Picker (out) select rows before Apply', async ({ page, context }) => {
       await navigateToDiscover(page);
 
-      // Pop out the Picker
+      // Listen for the new window BEFORE clicking pop-out
+      const popoutPromise = context.waitForEvent('page');
       await page.locator('#panel-manufacturer-model-picker .panel-header button[icon="pi pi-external-link"]').click();
-      await page.waitForTimeout(1000);
+      const popoutPage = await popoutPromise;
 
-      const pages = context.pages();
-      const popoutPage = pages[pages.length - 1];
       await popoutPage.waitForLoadState('domcontentloaded');
-      await popoutPage.waitForTimeout(500);
+      await popoutPage.waitForTimeout(1000);
 
       // Select rows in pop-out
       const checkboxes = popoutPage.locator('.p-datatable-tbody .p-checkbox-box');
@@ -713,20 +712,23 @@ test.describe('Category 1: Visual Appearance Tests', () => {
       await checkboxes.nth(1).click();
       await popoutPage.waitForTimeout(200);
 
-      await takeScreenshot(popoutPage, 'V1.9.3', 'picker-popout-selected');
+      // Screenshot the pop-out window (single image, no scrolling for pop-outs)
+      await takeOverlayScreenshot(popoutPage, 'V1.9.3', 'picker-popout-selected');
+
+      // Overlay screenshot: main window showing placeholder message
+      await takeOverlayScreenshot(page, 'V1.9.3', 'picker-popout-main-overlay');
     });
 
     test('V1.9.4 - Picker (out) after Apply clicked', async ({ page, context }) => {
       await navigateToDiscover(page);
 
-      // Pop out the Picker
+      // Listen for the new window BEFORE clicking pop-out
+      const popoutPromise = context.waitForEvent('page');
       await page.locator('#panel-manufacturer-model-picker .panel-header button[icon="pi pi-external-link"]').click();
-      await page.waitForTimeout(1000);
+      const popoutPage = await popoutPromise;
 
-      const pages = context.pages();
-      const popoutPage = pages[pages.length - 1];
       await popoutPage.waitForLoadState('domcontentloaded');
-      await popoutPage.waitForTimeout(500);
+      await popoutPage.waitForTimeout(1000);
 
       // Select rows
       const checkboxes = popoutPage.locator('.p-datatable-tbody .p-checkbox-box');
