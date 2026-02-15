@@ -2,7 +2,7 @@
 
 ## 1. System Overview
 
-The Generic Discovery Framework follows a **configuration-driven, URL-first architecture** that enables a single codebase to serve multiple data domains. The system is built on Angular 21 with standalone components, PrimeNG UI library, and a comprehensive service layer.
+The Generic Discovery Framework follows a **configuration-driven, URL-first architecture** that enables a single codebase to serve multiple data domains. The system is built on Angular 13.3 with NgModules, PrimeNG UI library, and a comprehensive service layer.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -41,21 +41,17 @@ The Generic Discovery Framework follows a **configuration-driven, URL-first arch
 ### 2.1 Directory Structure
 
 ```
-frontend/src/
-├── app/                           # Application bootstrap and routing
-│   ├── app.component.ts           # Root component (navigation, AI chat toggle)
-│   ├── app.config.ts              # Application configuration (providers)
-│   ├── app.routes.ts              # Route definitions (lazy loading)
-│   └── features/                  # Domain-specific feature components
-│       ├── home/                  # Landing page
-│       ├── automobile/            # Automobile domain
-│       ├── agriculture/           # Agriculture domain (stub)
-│       ├── chemistry/             # Chemistry domain (stub)
-│       ├── math/                  # Math domain (stub)
-│       ├── physics/               # Physics domain (curriculum + graphs)
-│       ├── discover/              # Generic discovery component
-│       ├── panel-popout/          # Pop-out window component
-│       └── ...
+src/app/
+├── app.component.ts               # Root component (navigation, AI chat toggle)
+├── app.module.ts                  # Root NgModule (providers, declarations)
+├── app-routing.module.ts          # Route definitions
+├── features/                      # Domain-specific feature components
+│   ├── home/                      # Landing page
+│   ├── automobile/                # Automobile domain
+│   ├── discover/                  # Generic discovery component
+│   ├── panel-popout/              # Pop-out window component
+│   ├── popout/                    # Popout feature
+│   └── ...
 │
 ├── framework/                     # Domain-agnostic framework
 │   ├── components/                # Reusable UI components
@@ -67,7 +63,10 @@ frontend/src/
 │   │   ├── query-control/         # Advanced filter dialogs
 │   │   ├── query-panel/           # Inline filter panel
 │   │   ├── results-table/         # Full-featured results table
-│   │   └── statistics-panel-2/    # Chart grid with drag-drop
+│   │   ├── statistics-panel/      # Statistics panel
+│   │   ├── statistics-panel-2/    # Chart grid with drag-drop
+│   │   ├── column-manager/        # Column management
+│   │   └── inline-filters/        # Inline filter components
 │   │
 │   ├── services/                  # Application services
 │   │   ├── api.service.ts         # HTTP client wrapper
@@ -77,23 +76,24 @@ frontend/src/
 │   │   ├── ai.service.ts          # LLM integration
 │   │   ├── user-preferences.service.ts     # Preference persistence
 │   │   ├── request-coordinator.service.ts  # Cache + dedup + retry
-│   │   ├── domain-config-registry.service.ts
+│   │   ├── domain-config-registry.service.ts  # Contains DOMAIN_CONFIG token
 │   │   ├── domain-config-validator.service.ts
 │   │   ├── error-notification.service.ts
 │   │   ├── global-error.handler.ts
 │   │   └── http-error.interceptor.ts
 │   │
 │   ├── models/                    # TypeScript interfaces
-│   │   ├── domain-config.ts       # DomainConfig interface
-│   │   ├── filter-definition.ts   # Filter configuration
-│   │   ├── table-config.ts        # Table column config
-│   │   ├── chart-config.ts        # Chart definitions
+│   │   ├── domain-config.interface.ts  # DomainConfig interface
+│   │   ├── filter-definition.interface.ts  # Filter configuration
+│   │   ├── table-config.interface.ts   # Table column config
+│   │   ├── picker-config.interface.ts  # Picker definitions
+│   │   ├── popout.interface.ts    # Pop-out types and utilities
+│   │   ├── resource-management.interface.ts  # State management types
 │   │   ├── ai.models.ts           # AI/chat models
 │   │   └── ...
 │   │
 │   └── tokens/                    # DI injection tokens
-│       ├── domain-config.token.ts # DOMAIN_CONFIG token
-│       └── is-popout.token.ts     # IS_POPOUT_TOKEN
+│       └── popout.token.ts        # IS_POPOUT_TOKEN
 │
 ├── domain-config/                 # Domain-specific configurations
 │   ├── domain-providers.ts        # Central domain registration
@@ -160,18 +160,17 @@ frontend/src/
 ┌─────────────────────────────────────────────────────────────────┐
 │                ResourceManagementService<TFilters, TData, TStat>│
 │  ┌────────────────────────────────────────────────────────────┐ │
-│  │ Signals (Angular 17)                                        │ │
-│  │  - filters = signal<TFilters>()                            │ │
-│  │  - results = signal<TData[]>()                             │ │
-│  │  - loading = signal<boolean>()                             │ │
-│  │  - statistics = signal<TStatistics>()                      │ │
-│  │  - highlights = signal<HighlightFilters>()                 │ │
+│  │ BehaviorSubject State Management                            │ │
+│  │  - stateSubject = new BehaviorSubject<ResourceState>()     │ │
+│  │  - state$ = stateSubject.asObservable()                    │ │
 │  └────────────────────────────────────────────────────────────┘ │
 │  ┌────────────────────────────────────────────────────────────┐ │
-│  │ Observable Streams (backward compatibility)                 │ │
-│  │  - state$ = toObservable(this.state)                       │ │
-│  │  - filters$ = toObservable(this.filters)                   │ │
-│  │  - results$ = toObservable(this.results)                   │ │
+│  │ Observable Streams (derived from state$)                    │ │
+│  │  - filters$ = state$.pipe(map(s => s.filters))             │ │
+│  │  - results$ = state$.pipe(map(s => s.results))             │ │
+│  │  - loading$ = state$.pipe(map(s => s.loading))             │ │
+│  │  - statistics$ = state$.pipe(map(s => s.statistics))       │ │
+│  │  - highlights$ = state$.pipe(map(s => s.highlights))       │ │
 │  └────────────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────────┘
                               │
@@ -229,7 +228,7 @@ API Response received
 state.update({ results, statistics, loading: false })
          │
          ▼
-Signals trigger component re-render
+Observable subscriptions trigger component re-render
          │
          ▼
 BroadcastChannel → Pop-out windows receive STATE_UPDATE
@@ -402,16 +401,21 @@ interface ICacheKeyBuilder<TFilters> {
 
 ```typescript
 enum PopOutMessageType {
+  // Main Window → Pop-Out
+  STATE_UPDATE = 'STATE_UPDATE',         // Sync full application state
+  CLOSE_POPOUT = 'CLOSE_POPOUT',         // Request pop-out to close
+
+  // Pop-Out → Main Window
   PANEL_READY = 'PANEL_READY',           // Pop-out initialized
-  STATE_UPDATE = 'STATE_UPDATE',         // Broadcast current state
-  URL_PARAMS_CHANGED = 'URL_PARAMS_CHANGED',  // Filter changed
   PICKER_SELECTION_CHANGE = 'PICKER_SELECTION_CHANGE',
   FILTER_ADD = 'FILTER_ADD',
   FILTER_REMOVE = 'FILTER_REMOVE',
   HIGHLIGHT_REMOVE = 'HIGHLIGHT_REMOVE',
   CLEAR_HIGHLIGHTS = 'CLEAR_HIGHLIGHTS',
-  CHART_CLICK = 'CHART_CLICK',
-  CLOSE_POPOUT = 'CLOSE_POPOUT'
+  CLEAR_ALL_FILTERS = 'CLEAR_ALL_FILTERS',
+  URL_PARAMS_CHANGED = 'URL_PARAMS_CHANGED',
+  URL_PARAMS_SYNC = 'URL_PARAMS_SYNC',
+  CHART_CLICK = 'CHART_CLICK'
 }
 ```
 
@@ -449,11 +453,12 @@ enum PopOutMessageType {
 ### 6.2 Retry Strategy
 
 ```typescript
-// HttpErrorInterceptor retry configuration
+// RequestCoordinatorService retry configuration
+// Uses exponential backoff: Math.pow(2, retryCount - 1) * initialDelayMs
 {
   maxRetries: 3,
   initialDelayMs: 1000,
-  backoffMultiplier: 2,  // exponential
+  // Exponential backoff: 1s, 2s, 4s
   retryableStatusCodes: [429, 500, 502, 503, 504]
 }
 ```
@@ -497,7 +502,7 @@ Namespace: generic-prime
 | **Configuration-Driven** | Domain logic externalized | domain-config/ |
 | **Dependency Injection** | Type-safe DI with tokens | DOMAIN_CONFIG token |
 | **URL-First State** | URL as source of truth | UrlStateService |
-| **Signals** | Fine-grained reactivity | ResourceManagementService |
+| **BehaviorSubject** | Reactive state management | ResourceManagementService |
 | **Observer** | RxJS for async operations | All services |
 | **Factory** | Domain config creation | createAutomobileDomainConfig() |
 | **Adapter** | API communication | IApiAdapter implementations |
@@ -509,12 +514,11 @@ Namespace: generic-prime
 
 | Pattern | Description |
 |---------|-------------|
-| **Standalone Components** | No NgModules, direct imports |
+| **NgModules** | Module-based organization (AppModule, FrameworkModule) |
 | **OnPush Change Detection** | Performance optimization |
-| **Lazy Loading** | Route-based code splitting |
-| **Signals** | Angular 17 reactive primitives |
-| **inject()** | Modern DI function (not constructor) |
-| **DestroyRef** | Cleanup via takeUntilDestroyed() |
+| **Constructor DI** | Constructor-based dependency injection |
+| **takeUntil Pattern** | Cleanup via Subject and takeUntil() |
+| **BehaviorSubject** | RxJS-based reactive state |
 
 ---
 
@@ -540,6 +544,6 @@ Namespace: generic-prime
 
 ---
 
-*Document Version: 1.0*
-*Last Updated: 2026-01-04*
-*Source: Generic Prime v21.3.2*
+*Document Version: 1.2*
+*Last Updated: 2026-02-14*
+*Source: vvroom codebase (Angular 13.3.0)*

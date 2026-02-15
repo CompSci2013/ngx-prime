@@ -235,7 +235,7 @@ popOutPanel(panelId: string, panelType: string): void {
       if (windowRef.closed) {
         this.closePopOut(panelId);
       }
-    }, 1000),
+    }, 500),
     panelId: panelId,
     panelType: panelType
   });
@@ -360,13 +360,17 @@ ngAfterViewInit(): void {
 | Message Type | Direction | Payload | Purpose |
 |--------------|-----------|---------|---------|
 | `STATE_UPDATE` | Main → Pop-out | `{ state: ResourceState }` | Sync application state |
+| `CLOSE_POPOUT` | Main → Pop-out | none | Main window requests pop-out close |
 | `PANEL_READY` | Pop-out → Main | none | Pop-out initialized and ready |
 | `PICKER_SELECTION_CHANGE` | Pop-out → Main | `PickerSelectionPayload` | User selected item in picker |
 | `FILTER_ADD` | Pop-out → Main | `QueryFilter` | User added filter in pop-out |
 | `FILTER_REMOVE` | Pop-out → Main | `{ field, updates }` | User removed filter in pop-out |
+| `HIGHLIGHT_REMOVE` | Pop-out → Main | `string` | User removed highlight |
+| `CLEAR_HIGHLIGHTS` | Pop-out → Main | none | Clear all highlights |
+| `CLEAR_ALL_FILTERS` | Pop-out → Main | none | Clear all filters and highlights |
 | `URL_PARAMS_CHANGED` | Pop-out → Main | `{ params: Params }` | URL parameters changed in pop-out |
 | `URL_PARAMS_SYNC` | Main → Pop-out | `{ params: Params }` | Sync URL parameters to pop-out |
-| `CLOSE_POPOUT` | Main → Pop-out | none | Main window requests pop-out close |
+| `CHART_CLICK` | Pop-out → Main | `{ chartId, value, isHighlightMode }` | Chart click/selection |
 
 ---
 
@@ -518,7 +522,7 @@ export class DiscoverComponent {
           this.popoutWindows.delete(panelId);
           clearInterval(this.popoutWindows.get(panelId)?.checkInterval);
         }
-      }, 1000),
+      }, 500),
       panelId,
       panelType
     });
@@ -710,8 +714,8 @@ Pop-outs should close automatically
 
 ### Prerequisites
 
-- Development server running on `http://localhost:4205`
-- Backend API running (`generic-prime.minilab`)
+- Development server running on `http://localhost:4207`
+- Backend API running
 - Chrome/Chromium browser (or any browser supporting BroadcastChannel API)
 
 ### Test Scenarios
@@ -719,7 +723,7 @@ Pop-outs should close automatically
 #### Test 1: Open Pop-Out Window
 
 **Steps**:
-1. Navigate to `http://localhost:4205/automobiles/discover`
+1. Navigate to `http://localhost:4200/automobiles/discover`
 2. Look for pop-out buttons on panels (⇲ icon or "Pop Out" button)
 3. Click pop-out button on "Model Picker" panel
 4. New window should open showing only the Model Picker
@@ -984,4 +988,4 @@ Pop-outs should close automatically
 
 ---
 
-**Last Updated**: 2025-12-14
+**Last Updated**: 2026-02-14

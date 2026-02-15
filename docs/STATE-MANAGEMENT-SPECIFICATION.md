@@ -15,11 +15,10 @@ The application implements a sophisticated **URL-First State Management** archit
 **Core Principle**: State flows from URL → Service → Components. Components never directly modify state; they request updates that flow through URL changes.
 
 **Key Services**:
-1. **ResourceManagementService<TFilters, TData>** - Generic, domain-agnostic state orchestrator (660 lines)
-2. **VehicleResourceManagementService** - Vehicle-specific implementation
-3. **UrlStateService** - URL parameter management (434 lines)
-4. **FilterUrlMapperService** - Filter ↔ URL serialization
-5. **RequestCoordinatorService** - Caching, deduplication, retry (265 lines)
+1. **ResourceManagementService<TFilters, TData, TStatistics>** - Generic, domain-agnostic state orchestrator (687 lines)
+2. **UrlStateService** - URL parameter management (434 lines)
+3. **IFilterUrlMapper** - Filter ↔ URL serialization (domain-specific implementations)
+4. **RequestCoordinatorService** - Caching, deduplication, retry (265 lines)
 
 ---
 
@@ -27,7 +26,7 @@ The application implements a sophisticated **URL-First State Management** archit
 
 1. [Architecture Overview](#1-architecture-overview)
 2. [ResourceManagementService](#2-resourcemanagementservice)
-3. [VehicleResourceManagementService](#3-vehicleresourcemanagementservice)
+3. [Domain Config Factory Pattern](#3-domain-config-factory-pattern)
 4. [UrlStateService](#4-urlstateservice)
 5. [FilterUrlMapperService](#5-filterurlmapperservice)
 6. [RequestCoordinatorService](#6-requestcoordinatorservice)
@@ -81,7 +80,7 @@ RequestCoordinatorService (Infrastructure Layer)
     ↓ (used by)
 ResourceManagementService<TFilters, TData> (Generic Layer)
     ↓ (extended/configured by)
-VehicleResourceManagementService (Domain Layer)
+DomainConfig + ResourceManagementService (Domain Layer)
     ↓ (injected into)
 Components (Presentation Layer)
 ```
@@ -90,13 +89,12 @@ Components (Presentation Layer)
 
 | File | Lines | Purpose |
 |------|-------|---------|
-| `resource-management.service.ts` | 660 | Generic state orchestrator |
-| `resource-management.types.ts` | 150 | Type definitions |
-| `vehicle-resource-management.factory.ts` | 168 | Vehicle service factory |
-| `url-state.service.ts` | 434 | URL management |
-| `filter-url-mapper.service.ts` | 126 | Filter serialization |
-| `request-coordinator.service.ts` | 265 | Request coordination |
-| `vehicle-resource-adapters.ts` | 203 | Vehicle adapters |
+| `resource-management.service.ts` | 687 | Generic state orchestrator |
+| `resource-management.interface.ts` | ~150 | Type definitions and adapter interfaces |
+| `url-state.service.ts` | 334 | URL management |
+| `request-coordinator.service.ts` | 334 | Request coordination |
+| `automobile-url-mapper.ts` | ~130 | Automobile domain URL mapping |
+| `automobile-api-adapter.ts` | ~200 | Automobile API adapter |
 
 ---
 
@@ -104,30 +102,31 @@ Components (Presentation Layer)
 
 ### Generic State Orchestrator
 
-**Location**: `frontend/src/app/core/services/resource-management.service.ts`
+**Location**: `src/app/framework/services/resource-management.service.ts`
 
 **Type Parameters**:
-- `TFilters` - Filter object shape (e.g., SearchFilters)
-- `TData` - Result object shape (e.g., VehicleResult)
+- `TFilters` - Filter object shape (e.g., AutomobileFilters)
+- `TData` - Result object shape (e.g., AutomobileData)
+- `TStatistics` - Statistics object shape (defaults to `any`)
 
 ### Configuration Interface
 
 ```typescript
-interface ResourceManagementConfig<TFilters, TData> {
+interface ResourceManagementConfig<TFilters, TData, TStatistics = any> {
   // Filter ↔ URL serialization
-  filterMapper: FilterUrlMapper<TFilters>;
+  filterMapper: IFilterUrlMapper<TFilters>;
 
   // API calls
-  apiAdapter: ApiAdapter<TFilters, TData>;
+  apiAdapter: IApiAdapter<TFilters, TData, TStatistics>;
 
   // Cache key generation
-  cacheKeyBuilder: CacheKeyBuilder<TFilters>;
+  cacheKeyBuilder: ICacheKeyBuilder<TFilters>;
 
   // Default filter values
   defaultFilters: TFilters;
 
-  // Enable highlight filters (h_* params)
-  supportsHighlights: boolean;
+  // Enable highlight filters (h_* params) - @deprecated, use filterMapper.extractHighlights()
+  supportsHighlights?: boolean;
 }
 ```
 
@@ -163,6 +162,7 @@ highlights$: Observable<Partial<TFilters>>
 
 **Implementation**:
 ```typescript
+// Using BehaviorSubject pattern (Angular 13)
 this.filters$ = this.state$.pipe(
   map(state => state.filters),
   distinctUntilChanged()
@@ -400,70 +400,64 @@ ngOnDestroy(): void {
 
 ---
 
-## 3. VEHICLERESOURCEMANAGEMENTSERVICE
+## 3. DOMAIN CONFIG FACTORY PATTERN
 
 ### Factory Function
 
-**Location**: `frontend/src/app/core/services/vehicle-resource-management.factory.ts`
+**Location**: `src/app/domain-config/automobile/automobile.domain-config.ts`
+
+The codebase uses a domain config factory pattern. The generic `ResourceManagementService` is configured via `DOMAIN_CONFIG` injection token rather than domain-specific service subclasses:
 
 ```typescript
-export function createVehicleResourceManagementService(
-  route: ActivatedRoute,
-  router: Router,
-  requestCoordinator: RequestCoordinatorService,
-  apiService: ApiService,
-  urlState: UrlStateService
-): VehicleResourceManagementService {
+export function createAutomobileDomainConfig(): DomainConfig<AutomobileFilters, AutomobileData, AutomobileStatistics> {
+  return {
+    domainName: 'automobile',
+    domainLabel: 'Automobiles',
+    apiBaseUrl: '/api/v1/automobiles',
 
-  // Create adapters
-  const filterMapper = new FilterUrlMapperService();
-  const apiAdapter = new VehicleApiAdapter(apiService);
-  const cacheKeyBuilder = new VehicleCacheKeyBuilder();
+    // Adapters
+    urlMapper: new AutomobileUrlMapper(),
+    apiAdapter: new AutomobileApiAdapter(),
+    cacheKeyBuilder: new AutomobileCacheKeyBuilder(),
 
-  // Configuration
-  const config: ResourceManagementConfig<SearchFilters, VehicleResult> = {
-    filterMapper,
-    apiAdapter,
-    cacheKeyBuilder,
+    // Default filters
     defaultFilters: {
       page: 1,
       size: 20,
     },
-    supportsHighlights: true,
-  };
 
-  // Create and return service
-  return new ResourceManagementService<SearchFilters, VehicleResult>(
-    route,
-    router,
-    requestCoordinator,
-    config
-  );
+    // UI Configurations
+    tableConfig: automobileTableConfig,
+    filters: automobileFilters,
+    charts: automobileCharts,
+    // ... other config
+  };
 }
 ```
 
 ### Provider Configuration
 
 ```typescript
-// In app.module.ts or feature module
-{
-  provide: VehicleResourceManagementService,
-  useFactory: createVehicleResourceManagementService,
-  deps: [
-    ActivatedRoute,
-    Router,
-    RequestCoordinatorService,
-    ApiService,
-    UrlStateService
-  ]
-}
+// In domain-providers.ts
+export const AUTOMOBILE_PROVIDERS = [
+  {
+    provide: DOMAIN_CONFIG,
+    useFactory: createAutomobileDomainConfig
+  }
+];
 ```
 
-### Type Alias
+### ResourceManagementService Injection
 
 ```typescript
-export type VehicleResourceManagementService =
-  ResourceManagementService<SearchFilters, VehicleResult>;
+// ResourceManagementService receives config via DOMAIN_CONFIG token
+@Injectable()
+export class ResourceManagementService<TFilters, TData, TStatistics = any> {
+  constructor(
+    @Inject(DOMAIN_CONFIG) private domainConfig: DomainConfig<TFilters, TData, TStatistics>,
+    // ...
+  ) {}
+}
 ```
 
 ---
@@ -474,7 +468,7 @@ export type VehicleResourceManagementService =
 
 Generic, reusable service for managing URL query parameters reactively.
 
-**Location**: `frontend/src/app/core/services/url-state.service.ts` (434 lines)
+**Location**: `src/app/framework/services/url-state.service.ts` (434 lines)
 
 ### Read Methods
 
@@ -670,29 +664,31 @@ this.route.queryParams
 
 ---
 
-## 5. FILTERURLMAPPERSERVICE
+## 5. IFILTERURLMAPPER INTERFACE
 
 ### Purpose
 
-Bidirectional mapping between SearchFilters and URL query parameters.
+Bidirectional mapping between filter objects and URL query parameters. Implemented per-domain via adapters.
 
-**Location**: `frontend/src/app/core/services/filter-url-mapper.service.ts` (126 lines)
+**Interface Location**: `src/app/framework/models/resource-management.interface.ts`
+**Automobile Implementation**: `src/app/domain-config/automobile/adapters/automobile-url-mapper.ts`
 
 ### Interface
 
 ```typescript
-interface FilterUrlMapper<TFilters> {
-  filtersToParams(filters: TFilters): Params;
-  paramsToFilters(params: Params): TFilters;
+interface IFilterUrlMapper<TFilters> {
+  toUrlParams(filters: TFilters): Params;
+  fromUrlParams(params: Params): TFilters;
+  extractHighlights?(params: Params): Record<string, any>;
 }
 ```
 
-### Implementation
+### Implementation Example (Automobile Domain)
 
 #### Filters → URL Parameters
 
 ```typescript
-filtersToParams(filters: SearchFilters): Params {
+toUrlParams(filters: AutomobileFilters): Params {
   const params: Params = {};
 
   // Simple mappings
@@ -723,8 +719,8 @@ filtersToParams(filters: SearchFilters): Params {
 #### URL Parameters → Filters
 
 ```typescript
-paramsToFilters(params: Params): SearchFilters {
-  const filters: SearchFilters = {
+fromUrlParams(params: Params): AutomobileFilters {
+  const filters: AutomobileFilters = {
     page: parseInt(params['page'], 10) || 1,
     size: parseInt(params['size'], 10) || 20,
   };
@@ -796,7 +792,7 @@ paramsToHighlights(params: Params): HighlightFilters {
 
 Coordinate HTTP requests with caching, deduplication, and retry logic.
 
-**Location**: `frontend/src/app/core/services/request-coordinator.service.ts` (265 lines)
+**Location**: `src/app/framework/services/request-coordinator.service.ts` (265 lines)
 
 ### Three-Layer Request Processing
 
@@ -1315,12 +1311,12 @@ class VehicleCacheKeyBuilder implements CacheKeyBuilder<SearchFilters> {
                            ▼
 ┌───────────────────────────────────────────────────────────────┐
 │ Angular bootstraps, DiscoverComponent created                 │
-│ - Injects: VehicleResourceManagementService                   │
+│ - Injects: ResourceManagementService                   │
 └──────────────────────────┬────────────────────────────────────┘
                            │
                            ▼
 ┌───────────────────────────────────────────────────────────────┐
-│ VehicleResourceManagementService constructor                  │
+│ ResourceManagementService constructor                  │
 │ - Calls: initializeFromUrl()                                  │
 │ - Parses URL → Filters                                        │
 │ - Calls: fetchData()                                          │
@@ -1420,7 +1416,7 @@ export class MyComponent implements OnInit, OnDestroy {
   results: VehicleResult[] = [];
   loading: boolean = false;
 
-  constructor(private stateService: VehicleResourceManagementService) {}
+  constructor(private stateService: ResourceManagementService) {}
 
   ngOnInit(): void {
     // Subscribe to filters
@@ -1539,7 +1535,7 @@ export class DiscoverComponent implements OnInit {
 export class PanelPopoutComponent implements OnInit {
   constructor(
     private route: ActivatedRoute,
-    private stateService: VehicleResourceManagementService,
+    private stateService: ResourceManagementService,
     private popOutContext: PopOutContextService
   ) {}
 

@@ -1,14 +1,14 @@
 # URL-First State Management: Implementation Audit
 
 **Audit Date**: 2026-02-05
-**Target Codebase**: ~/projects/simple-prime
+**Target Codebase**: ~/projects/vvroom
 **Specification Documents**: ARCHITECTURE-OVERVIEW.md, STATE-MANAGEMENT-SPECIFICATION.md, POPOUT-ARCHITECTURE.md
 
 ---
 
 ## Executive Summary
 
-The simple-prime codebase demonstrates **FULL COMPLIANCE** with the URL-First state management design specification. A comprehensive audit across six critical dimensions found zero violations and strong adherence to the architectural pattern where the URL serves as the single source of truth for application state.
+The vvroom codebase demonstrates **FULL COMPLIANCE** with the URL-First state management design specification. A comprehensive audit across six critical dimensions found zero violations and strong adherence to the architectural pattern where the URL serves as the single source of truth for application state.
 
 | Audit Dimension | Status | Violations |
 |----------------|--------|------------|
@@ -31,7 +31,7 @@ The design specifies UrlStateService as the centralized wrapper for Angular Rout
 
 ### Implementation Finding: COMPLIANT ✅
 
-**Location**: `/frontend/src/framework/services/url-state.service.ts`
+**Location**: `/src/app/framework/services/url-state.service.ts`
 
 The service implements all required methods with correct signatures:
 
@@ -67,7 +67,7 @@ Generic state orchestrator with type parameters `<TFilters, TData, TStatistics>`
 
 ### Implementation Finding: COMPLIANT ✅
 
-**Location**: `/frontend/src/framework/services/resource-management.service.ts`
+**Location**: `/src/app/framework/services/resource-management.service.ts`
 
 The service implements the URL-First pattern correctly:
 
@@ -117,7 +117,7 @@ Bidirectional mapping between filter objects and URL parameters via `IFilterUrlM
 
 ### Implementation Finding: COMPLIANT ✅
 
-**Interface Definition**: `/frontend/src/framework/models/resource-management.interface.ts`
+**Interface Definition**: `/src/app/framework/models/resource-management.interface.ts`
 ```typescript
 export interface IFilterUrlMapper<TFilters> {
   toUrlParams(filters: TFilters): Params;
@@ -130,19 +130,18 @@ export interface IFilterUrlMapper<TFilters> {
 
 | Domain | Mapper Class | Location |
 |--------|-------------|----------|
-| Automobile | `AutomobileUrlMapper` | `/domain-config/automobile/adapters/automobile-url-mapper.ts` |
-| Agriculture | `AgricultureUrlMapper` | `/domain-config/agriculture/adapters/agriculture-url-mapper.ts` |
+| Automobile | `AutomobileUrlMapper` | `/src/app/domain-config/automobile/adapters/automobile-url-mapper.ts` |
 
 **Serialization Features**:
 
-| Feature | Automobile | Agriculture |
-|---------|-----------|------------|
-| Numeric conversion | ✅ yearMin, yearMax | ✅ year, yieldMin/Max |
-| Array serialization | ✅ bodyClass (comma-separated) | ✅ |
-| Highlight extraction (h_*) | ✅ h_manufacturer, h_yearMin | ✅ h_crop, h_region |
-| Pipe-to-comma normalization | ✅ | ✅ |
-| Parameter validation | ✅ `validateUrlParams()` | - |
-| Shareable URL building | ✅ `buildShareableUrl()` | - |
+| Feature | Automobile |
+|---------|-----------|
+| Numeric conversion | ✅ yearMin, yearMax |
+| Array serialization | ✅ bodyClass (comma-separated) |
+| Highlight extraction (h_*) | ✅ h_manufacturer, h_yearMin |
+| Pipe-to-comma normalization | ✅ |
+| Parameter validation | ✅ `validateUrlParams()` |
+| Shareable URL building | ✅ `buildShareableUrl()` |
 
 **Highlight Filter Support**:
 Both mappers correctly extract `h_*` prefixed parameters for segmented statistics:
@@ -172,19 +171,19 @@ Pop-out windows must:
 
 ### Implementation Finding: COMPLIANT ✅
 
-**PopOutContextService**: `/frontend/src/framework/services/popout-context.service.ts`
+**PopOutContextService**: `/src/app/framework/services/popout-context.service.ts`
 - BroadcastChannel with `panel-${panelId}` naming convention
 - `initializeAsPopOut()` sends `PANEL_READY` message
 - `isInPopOut()` detects pop-out context via URL parsing
 - `getMessages$()` returns ReplaySubject for async message handling
 
-**PanelPopoutComponent**: `/frontend/src/app/features/panel-popout/panel-popout.component.ts`
+**PanelPopoutComponent**: `/src/app/features/panel-popout/panel-popout.component.ts`
 - OnPush change detection with `detectChanges()` (correct for pop-out)
 - Receives `STATE_UPDATE` via BroadcastChannel
 - Calls `syncStateFromExternal()` (no URL changes)
 - Injects `IS_POPOUT_TOKEN` to disable API calls
 
-**PopOutManagerService**: `/frontend/src/framework/services/popout-manager.service.ts`
+**PopOutManagerService**: `/src/app/framework/services/popout-manager.service.ts`
 - Opens pop-out windows with correct URL pattern
 - Creates BroadcastChannel per panel
 - `broadcastState()` sends STATE_UPDATE to all pop-outs
@@ -270,34 +269,33 @@ Three adapter interfaces for domain-agnostic operation:
 
 ### Implementation Finding: COMPLIANT ✅
 
-**Interface Definitions**: `/frontend/src/framework/models/resource-management.interface.ts`
+**Interface Definitions**: `/src/app/framework/models/resource-management.interface.ts`
 
 **Domain Coverage Matrix**:
 
 | Domain | IFilterUrlMapper | IApiAdapter | ICacheKeyBuilder |
 |--------|-----------------|-------------|------------------|
 | Automobile | ✅ AutomobileUrlMapper | ✅ AutomobileApiAdapter | ✅ AutomobileCacheKeyBuilder |
-| Agriculture | ✅ AgricultureUrlMapper | ✅ AgricultureApiAdapter | ✅ AgricultureCacheKeyBuilder |
 
 **Adapter Injection Pattern**:
 ```typescript
 // In domain config factory
-export function createAgricultureDomainConfig(injector: Injector): DomainConfig<...> {
+export function createAutomobileDomainConfig(): DomainConfig<...> {
   return {
-    apiAdapter: new AgricultureApiAdapter(httpClient, apiBaseUrl),
-    urlMapper: new AgricultureUrlMapper(),
-    cacheKeyBuilder: new AgricultureCacheKeyBuilder(),
+    apiAdapter: new AutomobileApiAdapter(),
+    urlMapper: new AutomobileUrlMapper(),
+    cacheKeyBuilder: new AutomobileCacheKeyBuilder(),
     // ...
   };
 }
 ```
 
 **ICacheKeyBuilder Highlight Support**:
-Both domain cache key builders include `h_*` highlight parameters in cache keys, ensuring distinct cache entries for different highlight configurations:
+Cache key builders include `h_*` highlight parameters in cache keys, ensuring distinct cache entries for different highlight configurations:
 ```typescript
 // In cache key builder
-if (highlights.crop) {
-  entries.push(['h_crop', highlights.crop]);
+if (highlights.manufacturer) {
+  entries.push(['h_manufacturer', highlights.manufacturer]);
 }
 ```
 
@@ -318,7 +316,7 @@ Both domain adapters return this exact shape.
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                         BROWSER URL                                  │
-│         /agriculture/discover?crop=corn&region=midwest&h_year=2024  │
+│    /automobiles/discover?manufacturer=Ford&yearMin=2020&h_year=2024 │
 └──────────────────────────┬──────────────────────────────────────────┘
                            │ (Single Source of Truth)
                            ▼
@@ -334,9 +332,9 @@ Both domain adapters return this exact shape.
 │         ResourceManagementService<TFilters, TData, TStatistics>      │
 │  ┌────────────────────────────────────────────────────────────────┐ │
 │  │ Adapters (from DOMAIN_CONFIG)                                   │ │
-│  │  • filterMapper: AgricultureUrlMapper                           │ │
-│  │  • apiAdapter: AgricultureApiAdapter                            │ │
-│  │  • cacheKeyBuilder: AgricultureCacheKeyBuilder                  │ │
+│  │  • filterMapper: AutomobileUrlMapper                            │ │
+│  │  • apiAdapter: AutomobileApiAdapter                             │ │
+│  │  • cacheKeyBuilder: AutomobileCacheKeyBuilder                   │ │
 │  └────────────────────────────────────────────────────────────────┘ │
 │                                                                      │
 │  URL Change → filterMapper.fromUrlParams() → state.update()         │
@@ -372,7 +370,7 @@ Both domain adapters return this exact shape.
 | router.navigate() encapsulation | Only in UrlStateService | ✅ Zero violations | ✅ |
 | Generic state orchestrator | Type parameters <TFilters, TData, TStats> | ✅ Fully generic | ✅ |
 | Adapter pattern | Three interfaces | ✅ All three implemented | ✅ |
-| Domain-specific adapters | Per-domain implementations | ✅ Automobile + Agriculture | ✅ |
+| Domain-specific adapters | Per-domain implementations | ✅ Automobile | ✅ |
 | Observable streams | filters$, results$, loading$, etc. | ✅ All implemented | ✅ |
 | Highlight filters (h_*) | Separate prefix, preserved in state | ✅ Full support | ✅ |
 | Pop-out BroadcastChannel | Cross-window messaging | ✅ Implemented | ✅ |
@@ -407,7 +405,7 @@ No architectural violations or deviations from the specification were found. The
 
 ## Conclusion
 
-The simple-prime implementation **fully adheres** to the URL-First State Management design specification. The architecture successfully:
+The vvroom implementation **fully adheres** to the URL-First State Management design specification. The architecture successfully:
 
 - Makes URL the single source of truth for application state
 - Routes all navigation through UrlStateService
