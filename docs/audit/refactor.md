@@ -20,6 +20,7 @@
 - `src/app/framework/adapters/generic-url-mapper.ts` — Generic URL mapper
 - `src/app/framework/adapters/generic-api-adapter.ts` — Generic API adapter
 - `src/app/framework/utils/config-generators.ts` — Table/Filter config generators
+- `src/app/framework/services/popout-manager.service.ts` — Encapsulated window management
 - `e2e/tests/url-mapper-regression.spec.ts` — 48 E2E tests (all passing)
 
 **Deleted legacy files (Phase 4 cleanup):**
