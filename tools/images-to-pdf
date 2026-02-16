@@ -1,6 +1,0 @@
-#!/bin/bash
-# Wrapper script for images-to-pdf.py
-# Usage: ./images-to-pdf <image_directory> [output.pdf]
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-"${SCRIPT_DIR}/.venv/bin/python" "${SCRIPT_DIR}/images-to-pdf.py" "$@"

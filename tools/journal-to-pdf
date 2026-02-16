@@ -1,6 +1,0 @@
-#!/bin/bash
-# Wrapper script for journal-to-pdf.py
-# Usage: ./journal-to-pdf <journal.md> <screenshots_dir> [output.pdf]
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-"${SCRIPT_DIR}/.venv/bin/python" "${SCRIPT_DIR}/journal-to-pdf.py" "$@"
