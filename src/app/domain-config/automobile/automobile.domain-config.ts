@@ -3,6 +3,14 @@
  *
  * Complete domain configuration combining all models, adapters, and UI configs
  * from milestones D1-D4.
+ *
+ * REFACTORED: Now uses generic implementations from the framework layer:
+ * - GenericUrlMapper replaces AutomobileUrlMapper
+ * - GenericApiAdapter replaces AutomobileApiAdapter
+ * - generateTableConfig() replaces AUTOMOBILE_TABLE_CONFIG
+ * - generateFilterDefinitions() replaces AUTOMOBILE_FILTER_DEFINITIONS
+ *
+ * See docs/audit/refactor.md for the simplification roadmap.
  */
 
 import { Injector } from '@angular/core';
@@ -14,19 +22,19 @@ import {
   VehicleResult,
   VehicleStatistics
 } from './models';
+import { AutomobileCacheKeyBuilder } from './adapters';
 import {
-  AutomobileApiAdapter,
-  AutomobileUrlMapper,
-  AutomobileCacheKeyBuilder
-} from './adapters';
-import {
-  AUTOMOBILE_TABLE_CONFIG,
-  AUTOMOBILE_FILTER_DEFINITIONS,
   AUTOMOBILE_QUERY_CONTROL_FILTERS,
   AUTOMOBILE_HIGHLIGHT_FILTERS,
   AUTOMOBILE_CHART_CONFIGS,
   AUTOMOBILE_PICKER_CONFIGS
 } from './configs';
+
+// Generic implementations from framework layer
+import { GenericUrlMapper } from '../../framework/adapters/generic-url-mapper';
+import { GenericApiAdapter } from '../../framework/adapters/generic-api-adapter';
+import { generateTableConfig, generateFilterDefinitions } from '../../framework/utils/config-generators';
+import { AUTOMOBILE_RESOURCE } from './automobile.resource';
 import {
   ManufacturerChartDataSource,
   TopModelsChartDataSource,
@@ -75,14 +83,24 @@ export function createAutomobileDomainConfig(injector: Injector): DomainConfig<
     statisticsModel: VehicleStatistics,
 
     // ==================== Adapters ====================
-    apiAdapter: new AutomobileApiAdapter(apiService, apiBaseUrl),
-    urlMapper: new AutomobileUrlMapper(),
+    // REFACTORED: Using generic implementations driven by AUTOMOBILE_RESOURCE
+    apiAdapter: new GenericApiAdapter<AutoSearchFilters, VehicleResult, VehicleStatistics>(
+      apiService,
+      AUTOMOBILE_RESOURCE,
+      {
+        baseUrl: apiBaseUrl,
+        dataTransformer: VehicleResult.fromApiResponse,
+        statisticsTransformer: VehicleStatistics.fromApiResponse
+      }
+    ),
+    urlMapper: new GenericUrlMapper<AutoSearchFilters>(AUTOMOBILE_RESOURCE),
     cacheKeyBuilder: new AutomobileCacheKeyBuilder(),
 
-  // ==================== UI Configuration ====================
-  tableConfig: AUTOMOBILE_TABLE_CONFIG,
-  pickers: AUTOMOBILE_PICKER_CONFIGS,
-  filters: AUTOMOBILE_FILTER_DEFINITIONS,
+    // ==================== UI Configuration ====================
+    // REFACTORED: Configs generated from AUTOMOBILE_RESOURCE
+    tableConfig: generateTableConfig<VehicleResult>(AUTOMOBILE_RESOURCE),
+    pickers: AUTOMOBILE_PICKER_CONFIGS,
+    filters: generateFilterDefinitions(AUTOMOBILE_RESOURCE),
   queryControlFilters: AUTOMOBILE_QUERY_CONTROL_FILTERS,
   highlightFilters: AUTOMOBILE_HIGHLIGHT_FILTERS,
   charts: AUTOMOBILE_CHART_CONFIGS,
