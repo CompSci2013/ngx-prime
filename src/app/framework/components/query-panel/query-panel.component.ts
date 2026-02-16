@@ -331,4 +331,65 @@ export class QueryPanelComponent<TFilters = any, TData = any, TStatistics = any>
         }
       });
   }
+
+  /**
+   * Handle range slider change - updates both min and max URL params
+   * Uses onSlideEnd to only trigger when user finishes dragging
+   */
+  onRangeSliderChange(filterDef: FilterDefinition, event: { values: number[] }): void {
+    const values = event.values;
+    if (!values || values.length !== 2) return;
+
+    const [minVal, maxVal] = values;
+    const minKey = filterDef.id + 'Min';
+    const maxKey = filterDef.id + 'Max';
+
+    // Update local model for UI
+    this.currentFilters[minKey] = minVal;
+    this.currentFilters[maxKey] = maxVal;
+
+    // Apply via URL-First pattern
+    if (this.popOutContext.isInPopOut()) {
+      this.urlParamsChange.emit({
+        [minKey]: minVal,
+        [maxKey]: maxVal,
+        page: 1
+      });
+    } else {
+      const newFilters: Record<string, any> = {
+        ...this.currentFilters,
+        [minKey]: minVal,
+        [maxKey]: maxVal,
+        page: 1
+      };
+      this.resourceService.updateFilters(newFilters as unknown as TFilters);
+    }
+  }
+
+  /**
+   * Clear a range filter (both min and max)
+   */
+  clearRangeFilter(filterId: string): void {
+    const minKey = filterId + 'Min';
+    const maxKey = filterId + 'Max';
+
+    this.currentFilters[minKey] = null;
+    this.currentFilters[maxKey] = null;
+
+    if (this.popOutContext.isInPopOut()) {
+      this.urlParamsChange.emit({
+        [minKey]: null,
+        [maxKey]: null,
+        page: 1
+      });
+    } else {
+      const newFilters: Record<string, any> = {
+        ...this.currentFilters,
+        [minKey]: undefined,
+        [maxKey]: undefined,
+        page: 1
+      };
+      this.resourceService.updateFilters(newFilters as unknown as TFilters);
+    }
+  }
 }

@@ -22,6 +22,7 @@
       (onSort)="onSort($event)"
       (onColReorder)="onColReorder($event)"
       (onColResize)="onColResize($event)"
+      (onRowExpand)="onRowExpand($event)"
       [showCurrentPageReport]="true"
       [currentPageReportTemplate]="'Showing {first} to {last} of {totalRecords} results'"
       [attr.data-testid]="environment.includeTestIds ? 'dynamic-results-table' : null">
@@ -65,16 +66,55 @@
         </tr>
       </ng-template>
 
-      <!-- Row Expansion -->
+      <!-- Row Expansion - VIN Sub-Table -->
       <ng-template pTemplate="rowexpansion" let-row>
         <tr>
           <td [attr.colspan]="columns.length + 1">
             <div class="row-expansion">
-              <h3>Details</h3>
-              <div class="expansion-grid">
-                <div *ngFor="let key of getObjectKeys(row)" class="expansion-field">
-                  <strong>{{ key }}:</strong> {{ row[key] }}
-                </div>
+              <div class="expansion-header">
+                <h3>VIN Records</h3>
+                <span class="vin-count">{{ row.instance_count || 0 }} VIN(s)</span>
+              </div>
+
+              <!-- Loading state -->
+              <div *ngIf="isVinLoading(row.vehicle_id)" class="vin-loading">
+                <p-progressSpinner [style]="{width: '30px', height: '30px'}"></p-progressSpinner>
+                <span>Loading VIN records...</span>
+              </div>
+
+              <!-- VIN Table -->
+              <div *ngIf="!isVinLoading(row.vehicle_id) && getVinsForVehicle(row.vehicle_id).length > 0" class="vin-table-container">
+                <p-table
+                  [value]="getVinsForVehicle(row.vehicle_id)"
+                  [columns]="vinColumns"
+                  styleClass="p-datatable-sm p-datatable-striped"
+                  [scrollable]="true"
+                  scrollHeight="300px">
+                  <ng-template pTemplate="header">
+                    <tr>
+                      <th *ngFor="let col of vinColumns" [ngStyle]="{'width': col.width}">
+                        {{ col.header }}
+                      </th>
+                    </tr>
+                  </ng-template>
+                  <ng-template pTemplate="body" let-vin>
+                    <tr>
+                      <td *ngFor="let col of vinColumns">
+                        <ng-container [ngSwitch]="col.field">
+                          <span *ngSwitchCase="'mileage'">{{ vin[col.field] | number }}</span>
+                          <span *ngSwitchCase="'estimated_value'">${{ vin[col.field] | number }}</span>
+                          <span *ngSwitchDefault>{{ vin[col.field] }}</span>
+                        </ng-container>
+                      </td>
+                    </tr>
+                  </ng-template>
+                </p-table>
+              </div>
+
+              <!-- No VINs message -->
+              <div *ngIf="!isVinLoading(row.vehicle_id) && getVinsForVehicle(row.vehicle_id).length === 0" class="no-vins">
+                <i class="pi pi-info-circle"></i>
+                <span>No VIN records found for this vehicle.</span>
               </div>
             </div>
           </td>

@@ -45,27 +45,27 @@
                   (click)="onFilterChange(filterDef.id, null)"></button>
               </div>
             </ng-container>
-            <!-- Range Input (dual number inputs for min/max) -->
+            <!-- Range Input (slider for min/max) -->
             <ng-container *ngIf="filterDef.type === 'range'">
-              <!-- Range Min with Clear -->
-              <div class="p-inputgroup">
-                <p-inputNumber [id]="filterDef.id + 'Min'"
-                  [(ngModel)]="currentFilters[filterDef.id + 'Min']"
-                  (ngModelChange)="onFilterChange(filterDef.id + 'Min', $event)"
-                  [showButtons]="true"
+              <div class="range-slider-field">
+                <div class="range-labels">
+                  <span>{{ currentFilters[filterDef.id + 'Min'] ?? filterDef.min ?? 0 }}</span>
+                  <span>{{ currentFilters[filterDef.id + 'Max'] ?? filterDef.max ?? 100 }}</span>
+                </div>
+                <p-slider
+                  [ngModel]="[+(currentFilters[filterDef.id + 'Min'] ?? filterDef.min ?? 0), +(currentFilters[filterDef.id + 'Max'] ?? filterDef.max ?? 100)]"
+                  (onSlideEnd)="onRangeSliderChange(filterDef, $event)"
+                  [range]="true"
                   [min]="+(filterDef.min ?? 0)"
-                  [max]="+(filterDef.max ?? 999999)"
-                  [step]="filterDef.step ?? 1"
-                  [useGrouping]="filterDef.format?.number?.useGrouping ?? true"
-                  [minFractionDigits]="filterDef.format?.number?.minimumFractionDigits ?? 0"
-                  [maxFractionDigits]="filterDef.format?.number?.maximumFractionDigits ?? 0"
-                  placeholder="Min">
-                </p-inputNumber>
+                  [max]="+(filterDef.max ?? 100)"
+                  [step]="filterDef.step ?? 1">
+                </p-slider>
                 <button
-                  *ngIf="currentFilters[filterDef.id + 'Min'] != null"
-                  pButton type="button" icon="pi pi-times"
-                  class="p-button-outlined p-button-secondary"
-                  (click)="onFilterChange(filterDef.id + 'Min', null)"></button>
+                  *ngIf="currentFilters[filterDef.id + 'Min'] != null || currentFilters[filterDef.id + 'Max'] != null"
+                  pButton type="button" icon="pi pi-times" label="Clear"
+                  class="p-button-outlined p-button-secondary p-button-sm clear-range-btn"
+                  (click)="clearRangeFilter(filterDef.id)">
+                </button>
               </div>
             </ng-container>
             <!-- Select Dropdown (single) -->
@@ -148,29 +148,6 @@
                 [binary]="true">
               </p-checkbox>
             </ng-container>
-          </div>
-          <!-- Range Max (second input for range type) with Clear -->
-          <div class="filter-field" *ngIf="filterDef.type === 'range'">
-            <label [for]="filterDef.id + 'Max'">{{ filterDef.label }} Max</label>
-            <div class="p-inputgroup">
-              <p-inputNumber [id]="filterDef.id + 'Max'"
-                [(ngModel)]="currentFilters[filterDef.id + 'Max']"
-                (ngModelChange)="onFilterChange(filterDef.id + 'Max', $event)"
-                [showButtons]="true"
-                [min]="+(filterDef.min ?? 0)"
-                [max]="+(filterDef.max ?? 999999)"
-                [step]="filterDef.step ?? 1"
-                [useGrouping]="filterDef.format?.number?.useGrouping ?? true"
-                [minFractionDigits]="filterDef.format?.number?.minimumFractionDigits ?? 0"
-                [maxFractionDigits]="filterDef.format?.number?.maximumFractionDigits ?? 0"
-                placeholder="Max">
-              </p-inputNumber>
-              <button
-                *ngIf="currentFilters[filterDef.id + 'Max'] != null"
-                pButton type="button" icon="pi pi-times"
-                class="p-button-outlined p-button-secondary"
-                (click)="onFilterChange(filterDef.id + 'Max', null)"></button>
-            </div>
           </div>
         </ng-container>
       </ng-container>

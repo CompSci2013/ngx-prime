@@ -23,6 +23,7 @@ import { TieredMenuModule } from 'primeng/tieredmenu';
 import { AutoCompleteModule } from 'primeng/autocomplete';
 import { CalendarModule } from 'primeng/calendar';
 import { PaginatorModule } from 'primeng/paginator';
+import { SliderModule } from 'primeng/slider';
 
 /**
  * Centralized PrimeNG UI Component Library Module
@@ -55,7 +56,8 @@ const PRIMENG_MODULES = [
   TieredMenuModule,
   AutoCompleteModule,
   CalendarModule,
-  PaginatorModule
+  PaginatorModule,
+  SliderModule
 ];
 
 /**

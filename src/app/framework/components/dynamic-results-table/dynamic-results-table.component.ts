@@ -10,6 +10,7 @@ import {
   OnInit,
   Output
 } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 import { Observable, Subject } from 'rxjs';
 import { filter, takeUntil } from 'rxjs/operators';
 import { environment } from '../../../../environments/environment';
@@ -93,6 +94,29 @@ export class DynamicResultsTableComponent<TFilters = any, TData = any, TStatisti
    */
   columns: any[] = [];
 
+  /**
+   * VIN data cache - stores fetched VINs by vehicle_id
+   */
+  vinCache: { [vehicleId: string]: any[] } = {};
+
+  /**
+   * VIN loading state - tracks which vehicles are currently loading VINs
+   */
+  vinLoading: { [vehicleId: string]: boolean } = {};
+
+  /**
+   * VIN columns for the sub-table
+   */
+  vinColumns = [
+    { field: 'vin', header: 'VIN', width: '180px' },
+    { field: 'exterior_color', header: 'Color', width: '100px' },
+    { field: 'mileage', header: 'Mileage', width: '100px' },
+    { field: 'condition_description', header: 'Condition', width: '100px' },
+    { field: 'estimated_value', header: 'Est. Value', width: '100px' },
+    { field: 'registered_state', header: 'State', width: '80px' },
+    { field: 'title_status', header: 'Title', width: '100px' }
+  ];
+
   // ============================================================================
   // Computed Properties
   // ============================================================================
@@ -124,7 +148,8 @@ export class DynamicResultsTableComponent<TFilters = any, TData = any, TStatisti
     private resourceService: ResourceManagementService<TFilters, TData, TStatistics>,
     private cdr: ChangeDetectorRef,
     private popOutContext: PopOutContextService,
-    private elementRef: ElementRef
+    private elementRef: ElementRef,
+    private http: HttpClient
   ) {}
 
   // ============================================================================
@@ -234,6 +259,59 @@ export class DynamicResultsTableComponent<TFilters = any, TData = any, TStatisti
     // Sync paginator width to match table width after resize
     this.syncPaginatorWidth();
     // Could persist column widths to user preferences in the future
+  }
+
+  /**
+   * Handle row expansion toggle - fetch VINs when expanded
+   */
+  onRowExpand(event: { data: any }): void {
+    const row = event.data;
+    const vehicleId = row.vehicle_id;
+
+    if (!vehicleId) {
+      return;
+    }
+
+    // Skip if already cached
+    if (this.vinCache[vehicleId]) {
+      return;
+    }
+
+    // Fetch VINs from API
+    this.vinLoading[vehicleId] = true;
+    this.cdr.markForCheck();
+
+    const url = `${environment.apiBaseUrl}/vehicles/${encodeURIComponent(vehicleId)}/vins?size=100`;
+
+    this.http.get<any>(url)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (response) => {
+          this.vinCache[vehicleId] = response.results || [];
+          this.vinLoading[vehicleId] = false;
+          this.cdr.markForCheck();
+        },
+        error: (err) => {
+          console.error('Error fetching VINs:', err);
+          this.vinCache[vehicleId] = [];
+          this.vinLoading[vehicleId] = false;
+          this.cdr.markForCheck();
+        }
+      });
+  }
+
+  /**
+   * Get VINs for a vehicle (from cache)
+   */
+  getVinsForVehicle(vehicleId: string): any[] {
+    return this.vinCache[vehicleId] || [];
+  }
+
+  /**
+   * Check if VINs are loading for a vehicle
+   */
+  isVinLoading(vehicleId: string): boolean {
+    return this.vinLoading[vehicleId] || false;
   }
 
   /**

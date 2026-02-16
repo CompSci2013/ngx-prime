@@ -113,28 +113,6 @@ export const AUTOMOBILE_FILTER_DEFINITIONS: FilterDefinition[] = [
   },
 
   /**
-   * Instance count range filter
-   *
-   * Uses format.number.useGrouping: true to show thousand separators
-   * (displays "1,000" instead of "1000")
-   */
-  {
-    id: 'instanceCountRange',
-    label: 'VIN Count Range',
-    type: 'range',
-    min: 0,
-    max: 10000,
-    step: 1,
-    format: {
-      number: {
-        useGrouping: true, // Show commas for VIN counts
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0
-      }
-    }
-  },
-
-  /**
    * Global search filter
    */
   {
@@ -242,14 +220,6 @@ export const AUTOMOBILE_FILTER_GROUPS = {
   },
 
   /**
-   * Quantity filters
-   */
-  quantity: {
-    label: 'VIN Count',
-    filters: ['instanceCountRange']
-  },
-
-  /**
    * General search
    */
   general: {
@@ -277,22 +247,6 @@ export const AUTOMOBILE_FILTER_VALIDATION = {
     }
     if (max && (max < 1900 || max > currentYear + 1)) {
       return false; // Year out of valid range
-    }
-    return true;
-  },
-
-  /**
-   * Validate instance count range
-   */
-  instanceCountRange: (min: number, max: number): boolean => {
-    if (min && max && min > max) {
-      return false; // Min cannot be greater than max
-    }
-    if (min && min < 0) {
-      return false; // Cannot be negative
-    }
-    if (max && max < 0) {
-      return false; // Cannot be negative
     }
     return true;
   }

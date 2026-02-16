@@ -37,6 +37,31 @@
         width: 100%;
       }
 
+      // Range slider styling
+      .range-slider-field {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        padding: 0.5rem 0;
+
+        .range-labels {
+          display: flex;
+          justify-content: space-between;
+          font-weight: 600;
+          font-size: 0.875rem;
+          color: var(--text-color);
+        }
+
+        ::ng-deep .p-slider {
+          width: 100%;
+        }
+
+        .clear-range-btn {
+          margin-top: 0.5rem;
+          align-self: flex-start;
+        }
+      }
+
       // Autocomplete styling for dark theme
       .autocomplete-field {
         p-autoComplete {
