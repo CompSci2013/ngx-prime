@@ -155,9 +155,9 @@ const modelCombosField: ResourceField = {
   customUrlParser: (value: string) => value, // Pass through as-is
   customUrlSerializer: (value: any) => String(value),
   customApiMapper: (value: any) => {
-    // Parse "Ford:F-150,Toyota:Camry" into structured format for API
-    // For now, pass through as-is - API handles the format
-    return { modelCombos: value };
+    // API expects parameter name 'models', not 'modelCombos'
+    // Format: "Ford:F-150,Toyota:Camry" passed as-is to API
+    return { models: value };
   }
 };
 
