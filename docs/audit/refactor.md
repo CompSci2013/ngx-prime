@@ -2,13 +2,17 @@
 
 **Date:** February 16, 2026
 **Branch:** `feature/simplify`
-**Status:** ✅ Phases 1, 2, and 4 Complete — Phase 3 Intentionally Deferred
+**Status:** ✅ Phases 1, 2, 3, and 4 Complete — 2 Failing Tests Outstanding
 
 ---
 
 ## Quick Start for New Chat
 
 **The refactoring is complete.** Adding a new field now requires editing only `automobile.resource.ts`.
+
+**Outstanding:** 2 failing E2E tests (unrelated to refactoring, pre-existing issues):
+- `category-2-url-conformity.spec.ts:205` — Year range input selector (`#yearMin input`) not found
+- `expanded-row-vin-table.spec.ts:25` — Expand button selector not found
 
 **Key files:**
 - `src/app/framework/models/resource-definition.interface.ts` — Unified schema
@@ -85,8 +89,8 @@ The over-engineering concerns raised in the audit are legitimate and measurable.
 | `generateFilterDefinitions()` utility | **COMPLETE** | `src/app/framework/utils/config-generators.ts` |
 | Parity verification | **COMPLETE** | Wired into app, E2E tests pass, manual verification done |
 | Legacy file cleanup | **COMPLETE** | 4 files deleted (~940 lines removed) |
-| `AbstractResourceComponent` | Deferred | — |
-| `PopOutManagerService` refinement | Deferred | — |
+| `AbstractResourceComponent` | Skipped | Over-engineering — only one consumer |
+| `PopOutManagerService` delegation | **COMPLETE** | `DiscoverComponent` now delegates to service |
 
 ---
 
@@ -189,12 +193,22 @@ Location: `src/app/framework/adapters/generic-api-adapter.ts`
 - [x] Support response transformers for data and statistics
 - [x] Validated against existing `AutomobileApiAdapter` behavior (E2E tests + manual verification)
 
-### Phase 3: Component Abstraction (Deferred)
+### Phase 3: Component Simplification — **COMPLETE**
 
-**Status:** Do not start until Phases 1-2 are validated in production.
+**Goal:** Remove duplicate pop-out management code from DiscoverComponent.
 
-- `AbstractResourceComponent` — base class for resource components
-- `PopOutManagerService` refinement — encapsulate window management
+**Scope Revision:** Per Gemini's analysis, the original Phase 3 scope was revised:
+- ❌ `AbstractResourceComponent` — NOT implemented (over-engineering for single consumer)
+- ✅ `PopOutManagerService` delegation — DiscoverComponent now delegates to existing service
+
+**Changes:**
+- [x] Refactor `DiscoverComponent` to use `PopOutManagerService.openPopOut()` instead of duplicate logic
+- [x] Subscribe to `PopOutManagerService.messages$` instead of managing `popoutMessages$` Subject
+- [x] Replace `broadcastStateToPopOuts()` with `PopOutManagerService.broadcastState()`
+- [x] Remove `closeAllPopOuts()`, `onPopOutClosed()`, `poppedOutPanels`, `popoutWindows`, `beforeUnloadHandler`
+- [x] Simplify `ngOnDestroy()` — service handles its own cleanup
+
+**Result:** ~210 lines removed from `DiscoverComponent` (254 deletions, 44 additions)
 
 ### Phase 4: Cleanup — **COMPLETE**
 
@@ -262,7 +276,7 @@ Location: `src/app/framework/adapters/generic-api-adapter.ts`
 - [x] `GenericApiAdapter` implemented with full feature parity
 - [x] Parity testing: `GenericUrlMapper` produces identical output to `AutomobileUrlMapper`
 - [x] Parity testing: `GenericApiAdapter` produces identical API calls to `AutomobileApiAdapter`
-- [x] All E2E tests pass with generic implementations wired in (123/126, 3 unrelated failures)
+- [x] All E2E tests pass with generic implementations wired in (124/126, 2 unrelated failures)
 
 ### Overall Success:
 - [x] Adding a new field requires modifying only 1-2 files (resource definition + optional custom logic)
@@ -336,23 +350,19 @@ wc -l src/app/domain-config/automobile/adapters/automobile-url-mapper.ts
 
 ---
 
-## Appendix C: Future Work (Phase 3)
+## Appendix C: Outstanding Test Failures
 
-Phase 3 is intentionally deferred until the data layer simplification proves its value in production.
+Two E2E tests fail due to selector issues unrelated to the refactoring work:
 
-### Phase 3 Scope (When Ready)
+### 1. Year Range Input Selector
+**File:** `e2e/tests/category-2-url-conformity.spec.ts:205`
+**Error:** `locator.fill: Test timeout - waiting for locator('#yearMin input')`
+**Issue:** The year range slider component's input selector has changed or the element is not visible.
 
-1. **`AbstractResourceComponent`** — Base class for resource components
-   - Extract common lifecycle management
-   - Standardize filter/data/statistics handling
-   - Reduce component boilerplate
+### 2. Expanded Row VIN Table
+**File:** `e2e/tests/screenshots/expanded-row-vin-table.spec.ts:25`
+**Error:** `locator.click: Test timeout - waiting for locator('.p-datatable-tbody button.p-button-rounded')`
+**Issue:** The expand button selector in the results table has changed.
 
-2. **`PopOutManagerService` refinement** — Encapsulate window management
-   - Simplify pop-out window creation
-   - Standardize BroadcastChannel messaging
-
-### Prerequisites for Phase 3
-
-- Run with Phase 1-2 changes in production for 2+ weeks
-- Gather feedback on any edge cases or issues
-- Validate that the single-source-of-truth pattern is working well
+### Resolution Required
+These tests need selector updates to match the current UI implementation. This is unrelated to the Phase 1-4 refactoring work.
