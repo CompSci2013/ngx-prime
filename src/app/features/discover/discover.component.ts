@@ -4,7 +4,6 @@ import {
   Component,
   Inject,
   Injector,
-  NgZone,
   OnDestroy,
   OnInit
 } from '@angular/core';
@@ -15,14 +14,10 @@ import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { createAutomobilePickerConfigs } from '../../domain-config/automobile/configs/automobile.picker-configs';
 import { DomainConfig } from '../../framework/models';
-import {
-  buildWindowFeatures,
-  PopOutMessageType,
-  PopOutWindowRef
-} from '../../framework/models/popout.interface';
+import { PopOutMessageType } from '../../framework/models/popout.interface';
 import { DOMAIN_CONFIG } from '../../framework/services/domain-config-registry.service';
 import { PickerConfigRegistry } from '../../framework/services/picker-config-registry.service';
-import { PopOutContextService } from '../../framework/services/popout-context.service';
+import { PopOutManagerService } from '../../framework/services/popout-manager.service';
 import { ResourceManagementService } from '../../framework/services/resource-management.service';
 import { UrlStateService } from '../../framework/services/url-state.service';
 import { UserPreferencesService } from '../../framework/services/user-preferences.service';
@@ -106,7 +101,7 @@ import { ChartDataSource } from '../../framework/components/base-chart/base-char
     templateUrl: './discover.component.html',
     styleUrls: ['./discover.component.scss'],
     changeDetection: ChangeDetectionStrategy.OnPush,
-    providers: [ResourceManagementService]
+    providers: [ResourceManagementService, PopOutManagerService]
 })
 export class DiscoverComponent<TFilters = any, TData = any, TStatistics = any>
   implements OnInit, OnDestroy {
@@ -114,12 +109,6 @@ export class DiscoverComponent<TFilters = any, TData = any, TStatistics = any>
    * Domain configuration (injected, works with any domain)
    */
   domainConfig: DomainConfig<TFilters, TData, TStatistics>;
-
-  /**
-   * Set of panel IDs that are currently popped out
-   * Pop-outs are closed on page refresh (beforeunload)
-   */
-  private poppedOutPanels = new Set<string>();
 
   /**
    * Map of collapsed panel states (panel ID → collapsed boolean)
@@ -138,28 +127,9 @@ export class DiscoverComponent<TFilters = any, TData = any, TStatistics = any>
   ];
 
   /**
-   * Map of pop-out windows and their associated channels
-   */
-  private popoutWindows = new Map<string, PopOutWindowRef>();
-
-  /**
    * Destroy signal for subscription cleanup
    */
   private destroy$ = new Subject<void>();
-
-  /**
-   * Bound beforeunload handler (needs reference for removeEventListener)
-   */
-  private beforeUnloadHandler = () => this.closeAllPopOuts();
-
-  /**
-   * RxJS Subject for pop-out messages (Observable Pattern)
-   * Pushes browser API events into Angular zone for change detection
-   */
-  private popoutMessages$ = new Subject<{
-    panelId: string;
-    event: MessageEvent;
-  }>();
 
   /**
    * Grid identifier for routing
@@ -175,11 +145,10 @@ export class DiscoverComponent<TFilters = any, TData = any, TStatistics = any>
     >,
     private pickerRegistry: PickerConfigRegistry,
     private injector: Injector,
-    private popOutContext: PopOutContextService,
+    private popOutManager: PopOutManagerService,
     private cdr: ChangeDetectorRef,
     private messageService: MessageService,
     private urlStateService: UrlStateService,
-    private ngZone: NgZone,
     private userPreferences: UserPreferencesService
   ) {
     // Store injected config (works with any domain)
@@ -194,30 +163,16 @@ export class DiscoverComponent<TFilters = any, TData = any, TStatistics = any>
    * Angular lifecycle hook - Initialize component
    *
    * **Initialization Sequence**:
-   * 1. Register picker configs with registry (domain-specific pickers)
-   * 2. Initialize PopOutContextService as parent window
-   * 3. Set up beforeunload handler to close pop-outs on page refresh
-   * 4. Subscribe to pop-out context messages
-   * 5. Subscribe to pop-out BroadcastChannel messages via RxJS Subject
-   * 6. Subscribe to ResourceManagementService.state$ and broadcast to all pop-outs
-   *
-   * **Observable Subscriptions**:
-   * - popOutContext.getMessages$(): Pop-out context messages from PopOutContextService
-   * - popoutMessages$: BroadcastChannel messages wrapped in RxJS Subject
-   * - resourceService.state$: State changes that need to broadcast to pop-outs
-   *
-   * **Why RxJS Subject for BroadcastChannel?**
-   * BroadcastChannel callbacks run outside Angular's zone, bypassing change detection.
-   * By pushing events into popoutMessages$ Subject, we bring them into Angular zone
-   * so Angular automatically triggers change detection and component updates.
+   * 1. Load panel preferences from UserPreferencesService
+   * 2. Register domain-specific picker configurations
+   * 3. Initialize PopOutManagerService (handles beforeunload, BroadcastChannel setup)
+   * 4. Subscribe to pop-out messages and state broadcasting
    *
    * **Memory Management**:
    * All subscriptions are cleaned up via takeUntil(destroy$) in ngOnDestroy.
    */
   ngOnInit(): void {
     // STEP 1: Load panel preferences from UserPreferencesService
-    // Subscribe to panel order preference (persisted in localStorage)
-    // This ensures panels display in user's preferred order on every page load
     this.userPreferences.getPanelOrder()
       .pipe(takeUntil(this.destroy$))
       .subscribe(order => {
@@ -225,12 +180,9 @@ export class DiscoverComponent<TFilters = any, TData = any, TStatistics = any>
         this.cdr.markForCheck();
       });
 
-    // Subscribe to collapsed panels preference (persisted in localStorage)
-    // This ensures collapsed state is restored on page load
     this.userPreferences.getCollapsedPanels()
       .pipe(takeUntil(this.destroy$))
       .subscribe(collapsedPanels => {
-        // Clear current collapsed state and restore from preferences
         this.collapsedPanels.clear();
         collapsedPanels.forEach(panelId => {
           this.collapsedPanels.set(panelId, true);
@@ -239,57 +191,43 @@ export class DiscoverComponent<TFilters = any, TData = any, TStatistics = any>
       });
 
     // STEP 2: Register domain-specific picker configurations
-    // Pickers are domain-specific (e.g., ManufacturerModel for automobiles)
-    // createAutomobilePickerConfigs() returns an array of PickerConfig objects
-    // These are registered globally so any component can reference them by ID
     const pickerConfigs = createAutomobilePickerConfigs(this.injector);
     this.pickerRegistry.registerMultiple(pickerConfigs);
 
-    // STEP 3: Initialize PopOutContextService as parent (main) window
-    // This marks the service as "not a pop-out" (as opposed to PanelPopoutComponent)
-    // Allows PopOutContextService to distinguish main window from pop-outs
-    this.popOutContext.initializeAsParent();
+    // STEP 3: Initialize PopOutManagerService
+    // Handles: beforeunload cleanup, BroadcastChannel setup, window polling
+    this.popOutManager.initialize(this.gridId);
 
-    // STEP 4: Close all pop-outs when user refreshes/closes main window
-    // beforeunload is more reliable than unload for cleanup
-    // Ensures pop-out windows are explicitly closed before main window unloads
-    window.addEventListener('beforeunload', this.beforeUnloadHandler);
-
-    // STEP 5: Listen for messages from pop-outs via PopOutContextService
-    // PopOutContextService maintains a global subscription to BroadcastChannel
-    // This captures any messages sent by pop-outs (PANEL_READY, PICKER_SELECTION_CHANGE, etc.)
-    this.popOutContext
-      .getMessages$()
+    // STEP 4: Subscribe to pop-out messages from PopOutManagerService
+    this.popOutManager.messages$
       .pipe(takeUntil(this.destroy$))
-      .subscribe(message => {
+      .subscribe(({ message }) => {
         this.handlePopOutMessage('', message);
       });
 
-    // STEP 6: Subscribe to pop-out BroadcastChannel messages
-    // BroadcastChannel.onmessage callbacks run OUTSIDE Angular zone
-    // We push them into popoutMessages$ Subject to bring them INTO Angular zone
-    // This ensures Angular detects changes and re-renders components
-    // Each panel's popOutPanel() method sets up channel.onmessage listener
-    this.popoutMessages$
+    // STEP 5: Handle pop-out window closures
+    this.popOutManager.closed$
       .pipe(takeUntil(this.destroy$))
-      .subscribe(({ panelId, event }) => {
-        this.handlePopOutMessage(panelId, event.data);
+      .subscribe(() => {
+        this.cdr.markForCheck();
+      });
+
+    // STEP 6: Handle pop-up blocked notifications
+    this.popOutManager.blocked$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => {
+        this.messageService.add({
+          severity: 'warn',
+          summary: 'Pop-up Blocked',
+          detail: 'Please allow pop-ups for this site to use the pop-out feature',
+          life: 5000
+        });
       });
 
     // STEP 7: Broadcast state changes to all open pop-outs
-    // URL-First Architecture: Main window is source of truth
-    // Flow: URL change → ResourceManagementService.fetchData() →
-    //       state$ emits → broadcastStateToPopOuts() → BroadcastChannel →
-    //       pop-outs' ResourceManagementService.syncStateFromExternal() → pop-out components re-render
-    // This subscription fires every time state$ emits (filters, results, loading, error, statistics)
     this.resourceService.state$.pipe(takeUntil(this.destroy$)).subscribe(state => {
-      this.broadcastStateToPopOuts(state);
+      this.popOutManager.broadcastState(state);
     });
-
-    // Note: URL parameter broadcasting to pop-outs is now handled exclusively through STATE_UPDATE
-    // messages (broadcastStateUpdateToPopOuts). Pop-out Query Control subscribes to STATE_UPDATE
-    // via BroadcastChannel and extracts filters from the state payload.
-    // Previous URL_PARAMS_SYNC mechanism was redundant and has been removed (Session 40).
   }
 
   /**
@@ -299,7 +237,7 @@ export class DiscoverComponent<TFilters = any, TData = any, TStatistics = any>
    * @returns True if panel is popped out
    */
   isPanelPoppedOut(panelId: string): boolean {
-    return this.poppedOutPanels.has(panelId);
+    return this.popOutManager.isPoppedOut(panelId);
   }
 
   /**
@@ -385,85 +323,20 @@ export class DiscoverComponent<TFilters = any, TData = any, TStatistics = any>
   /**
    * Pop out a panel to a separate window
    *
+   * Delegates to PopOutManagerService which handles:
+   * - Window creation with proper features
+   * - BroadcastChannel setup and message routing
+   * - Window close polling
+   * - Cleanup on close
+   *
    * @param panelId - Panel identifier (e.g., 'query-control', 'manufacturer-model-picker')
    * @param panelType - Panel type for routing (e.g., 'query-control', 'picker', 'statistics', 'results')
    */
   popOutPanel(panelId: string, panelType: string): void {
-    // Check if already popped out
-    if (this.poppedOutPanels.has(panelId)) {
-      return;
+    const opened = this.popOutManager.openPopOut(panelId, panelType);
+    if (opened) {
+      this.cdr.markForCheck();
     }
-
-    // Build pop-out URL using route path (no query params needed)
-    // AppComponent detects pop-out by checking if URL starts with '/panel/'
-    // This approach matches golden-extension's implementation
-    const url = `/panel/${this.gridId}/${panelId}/${panelType}`;
-
-    // Window features
-    const features = buildWindowFeatures({
-      width: 1200,
-      height: 800,
-      left: 100,
-      top: 100,
-      resizable: true,
-      scrollbars: true
-    });
-
-    // Open window (state will be broadcast via BroadcastChannel, not URL)
-    const popoutWindow = window.open(url, `panel-${panelId}`, features);
-
-    if (!popoutWindow) {
-      // Pop-up blocked
-      this.messageService.add({
-        severity: 'warn',
-        summary: 'Pop-up Blocked',
-        detail: 'Please allow pop-ups for this site to use the pop-out feature',
-        life: 5000
-      });
-      return;
-    }
-
-    // Track as popped out
-    this.poppedOutPanels.add(panelId);
-
-    // Set up BroadcastChannel for this panel
-    const channel = this.popOutContext.createChannelForPanel(panelId);
-
-    // Listen for messages from pop-out (Observable Pattern)
-    // IMPORTANT: Wrap handler in ngZone.run() to re-enter Angular zone immediately
-    // BroadcastChannel.onmessage is a native browser event that fires outside the zone.
-    // Re-entering the zone here ensures the entire downstream chain (Subject emission →
-    // handlePopOutMessage → UrlStateService → Router) runs inside the zone with proper
-    // change detection awareness. This is architecturally correct per Angular zone principles.
-    channel.onmessage = event => {
-      console.log('[DiscoverComponent] BroadcastChannel message received', { panelId, message: event.data });
-      this.ngZone.run(() => {
-        this.popoutMessages$.next({ panelId, event });
-      });
-    };
-
-    // Monitor for window close
-    // IMPORTANT: setInterval runs outside Angular zone, so wrap in ngZone.run()
-    // to ensure change detection runs when pop-out is closed
-    const checkInterval = window.setInterval(() => {
-      if (popoutWindow.closed) {
-        this.ngZone.run(() => {
-          this.onPopOutClosed(panelId, channel, checkInterval);
-        });
-      }
-    }, 500);
-
-    // Store reference
-    this.popoutWindows.set(panelId, {
-      window: popoutWindow,
-      channel,
-      checkInterval,
-      panelId,
-      panelType
-    });
-
-    // Trigger change detection to hide panel
-    this.cdr.markForCheck();
   }
 
   /**
@@ -473,13 +346,11 @@ export class DiscoverComponent<TFilters = any, TData = any, TStatistics = any>
    * @param message - Message from pop-out
    */
   private async handlePopOutMessage(_panelId: string, message: any): Promise<void> {
-    console.log('[DiscoverComponent] handlePopOutMessage', { panelId: _panelId, type: message.type, payload: message.payload });
     switch (message.type) {
       case PopOutMessageType.PANEL_READY:
         // Pop-out is ready - broadcast current state immediately
-        // (state$ subscription only fires on changes, not on initial subscription)
         const currentState = this.resourceService.getCurrentState();
-        this.broadcastStateToPopOuts(currentState);
+        this.popOutManager.broadcastState(currentState);
         break;
 
       case PopOutMessageType.URL_PARAMS_CHANGED:
@@ -577,29 +448,6 @@ export class DiscoverComponent<TFilters = any, TData = any, TStatistics = any>
   }
 
   /**
-   * Handle pop-out window closure
-   *
-   * @param panelId - Panel identifier
-   * @param channel - BroadcastChannel to close
-   * @param checkInterval - Interval to clear
-   */
-  private onPopOutClosed(
-    panelId: string,
-    channel: BroadcastChannel,
-    checkInterval: number
-  ): void {
-
-    // Clean up
-    clearInterval(checkInterval);
-    channel.close();
-    this.popoutWindows.delete(panelId);
-    this.poppedOutPanels.delete(panelId);
-
-    // Trigger change detection to show panel again
-    this.cdr.markForCheck();
-  }
-
-  /**
    * Handle URL parameter changes from components
    * Updates the URL in main window
    *
@@ -677,66 +525,8 @@ export class DiscoverComponent<TFilters = any, TData = any, TStatistics = any>
     });
   }
 
-  /**
-   * Close all pop-out windows
-   * Called on beforeunload to clean up pop-outs when main window refreshes
-   */
-  private closeAllPopOuts(): void {
-
-    // Send CLOSE_POPOUT to all pop-outs
-    this.popoutWindows.forEach(({ channel }) => {
-      channel.postMessage({
-        type: PopOutMessageType.CLOSE_POPOUT,
-        timestamp: Date.now()
-      });
-    });
-  }
-
-  /**
-   * Broadcast full state to all pop-out windows
-   * This is called whenever main window state changes
-   *
-   * Architecture: Main window URL is the single source of truth.
-   * URL → ResourceManagementService → state$ → BroadcastChannel → pop-out windows
-   * Pop-outs receive state and sync to their ResourceManagementService (no API calls)
-   *
-   * @param state - Current resource state
-   */
-  private broadcastStateToPopOuts(state: any): void {
-    if (this.popoutWindows.size === 0) {
-      return; // No pop-outs, skip broadcast
-    }
-
-    // Send STATE_UPDATE to all pop-outs
-    this.popoutWindows.forEach(({ channel }) => {
-      const message = {
-        type: PopOutMessageType.STATE_UPDATE,
-        payload: { state },
-        timestamp: Date.now()
-      };
-
-      try {
-        channel.postMessage(message);
-      } catch (error) {
-        // Silently ignore posting errors (window may have closed)
-      }
-    });
-  }
-
-
   ngOnDestroy(): void {
-    // Remove beforeunload handler
-    window.removeEventListener('beforeunload', this.beforeUnloadHandler);
-
-    // Clean up all pop-out windows
-    this.popoutWindows.forEach(({ window, channel, checkInterval }) => {
-      clearInterval(checkInterval);
-      channel.close();
-      if (window && !window.closed) {
-        window.close();
-      }
-    });
-
+    // PopOutManagerService handles its own cleanup in ngOnDestroy
     this.destroy$.next();
     this.destroy$.complete();
   }
