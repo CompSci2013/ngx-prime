@@ -79,8 +79,8 @@ function parseArgs(): GeneratorOptions {
     outdir,
     exclude,
     noFilter,
-    probeUrls: multiOpts.probe,
-    samples: multiOpts.sample,
+    probeUrls: multiOpts['probe'],
+    samples: multiOpts['sample'],
     openapi: opts['openapi'],
   };
 }
