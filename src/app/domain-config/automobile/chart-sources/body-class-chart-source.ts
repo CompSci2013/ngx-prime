@@ -7,7 +7,7 @@
  * Domain: Automobile
  */
 
-import { ChartDataSource, ChartData } from '../../../framework/components/base-chart/base-chart.component';
+import { ChartDataSource, ChartData } from '../../../lib/framework';
 import { VehicleStatistics } from '../models/automobile.statistics';
 
 /**

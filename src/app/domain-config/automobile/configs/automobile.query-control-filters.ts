@@ -7,7 +7,7 @@
  * Domain: Automobile Discovery
  */
 
-import { FilterDefinition, FilterOption } from '../../../framework/models/filter-definition.interface';
+import { FilterDefinition, FilterOption } from '../../../lib/config';
 import { AutoSearchFilters } from '../models/automobile.filters';
 import { environment } from '../../../../environments/environment';
 

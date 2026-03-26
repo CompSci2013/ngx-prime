@@ -8,7 +8,7 @@
  */
 
 import { Injectable } from '@angular/core';
-import { ICacheKeyBuilder } from '../../../framework/models/resource-management.interface';
+import { ICacheKeyBuilder } from '../../../lib/state-management';
 import { AutoSearchFilters } from '../models/automobile.filters';
 
 /**

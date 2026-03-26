@@ -7,9 +7,9 @@
  * Domain: Automobile Discovery
  */
 
-import { PickerConfig } from '../../../framework/models/picker-config.interface';
+import { PickerConfig } from '../../../lib/config';
 import { Injector } from '@angular/core';
-import { ApiService } from '../../../framework/services';
+import { ApiService } from '../../../lib/state-management';
 import { environment } from '../../../../environments/environment';
 
 /**

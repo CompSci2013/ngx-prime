@@ -1,0 +1,47 @@
+<!-- Statistics Panel 2 Component Template - CDK Mixed Orientation Chart Grid -->
+<div class="statistics-content" [attr.data-testid]="environment.includeTestIds ? 'statistics-panel-2' : null">
+  <!-- No data message -->
+  <ng-container *ngIf="!statistics">
+    <div class="no-data-message">
+      <i class="pi pi-info-circle"></i>
+      <p>No statistics available. Add filters or select data to view distributions.</p>
+    </div>
+  </ng-container>
+
+  <!-- Chart Grid with CDK Mixed Orientation -->
+  <ng-container *ngIf="statistics">
+    <div
+      cdkDropList
+      cdkDropListOrientation="horizontal"
+      (cdkDropListDropped)="onChartDrop($any($event))"
+      class="chart-grid">
+      <ng-container *ngFor="let chartId of chartOrder">
+        <ng-container *ngIf="getDataSource(chartId) as dataSource">
+          <div class="chart-box" cdkDrag>
+            <!-- Drag Handle -->
+            <div class="chart-drag-handle" cdkDragHandle>
+              <i class="pi pi-bars"></i>
+            </div>
+            <ng-container *ngIf="!isPanelPoppedOut('chart-' + chartId); else chartPoppedOutPlaceholder">
+              <app-base-chart
+                [dataSource]="dataSource"
+                [statistics]="statistics"
+                [highlights]="highlights"
+                [selectedValue]="null"
+                [canPopOut]="true"
+                (popOutClick)="onChartPopOut(chartId)"
+                (chartClick)="onChartClick($event, chartId)">
+              </app-base-chart>
+            </ng-container>
+            <ng-template #chartPoppedOutPlaceholder>
+              <div class="popout-placeholder">
+                <i class="pi pi-external-link"></i>
+                <span>Chart is open in a separate window</span>
+              </div>
+            </ng-template>
+          </div>
+        </ng-container>
+      </ng-container>
+    </div>
+  </ng-container>
+</div>

@@ -7,7 +7,7 @@
  * Domain: Automobile Discovery
  */
 
-import { ChartConfig } from '../../../framework/models/domain-config.interface';
+import { ChartConfig } from '../../../lib/config';
 
 /**
  * Automobile chart configurations

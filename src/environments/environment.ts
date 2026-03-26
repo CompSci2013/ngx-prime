@@ -51,7 +51,7 @@ export const environment = {
    * - Port: 80 (standard HTTP, routed through Traefik ingress)
    * - Path: /api/specs/v1 (API route prefix for data discovery service)
    */
-  apiBaseUrl: 'http://generic-prime.minilab/api/specs/v1',
+  apiBaseUrl: 'http://192.168.0.244:4208/api/specs/v1',
 
   /**
    * E2E test attribute flag

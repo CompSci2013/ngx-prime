@@ -23,7 +23,7 @@
  * ```
  */
 
-import { ResourceDefinition, ResourceField } from '../../framework/models/resource-definition.interface';
+import { ResourceDefinition, ResourceField } from '../../lib/config';
 
 /**
  * Automobile Resource Fields

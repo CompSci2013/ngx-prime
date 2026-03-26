@@ -12,17 +12,15 @@ import { DragDropModule } from '@angular/cdk/drag-drop';
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
 import { PrimengModule } from './primeng.module';
-import { FrameworkModule } from './framework/framework.module';
-import { GlobalErrorHandler } from './framework/services/global-error.handler';
-import { HttpErrorInterceptor } from './framework/services/http-error.interceptor';
-import { DOMAIN_CONFIG } from './framework/services/domain-config-registry.service';
+import { FrameworkModule, GlobalErrorHandler, HttpErrorInterceptor } from './lib/framework';
+import { DOMAIN_CONFIG, ENVIRONMENT_CONFIG } from './lib/config';
+import { PopoutModule } from './lib/popout';
 import { createAutomobileDomainConfig } from './domain-config/automobile';
+import { environment } from '../environments/environment';
 
 // Feature Components
 import { HomeComponent } from './features/home/home.component';
 import { DiscoverComponent } from './features/discover/discover.component';
-import { PopoutComponent } from './features/popout/popout.component';
-import { PanelPopoutComponent } from './features/panel-popout/panel-popout.component';
 import { AutomobileComponent } from './features/automobile/automobile.component';
 
 /**
@@ -42,8 +40,6 @@ import { AutomobileComponent } from './features/automobile/automobile.component'
     AppComponent,
     HomeComponent,
     DiscoverComponent,
-    PopoutComponent,
-    PanelPopoutComponent,
     AutomobileComponent
   ],
   imports: [
@@ -54,7 +50,8 @@ import { AutomobileComponent } from './features/automobile/automobile.component'
     DragDropModule,
     AppRoutingModule,
     PrimengModule,
-    FrameworkModule
+    FrameworkModule,
+    PopoutModule
   ],
   providers: [
     MessageService,
@@ -71,6 +68,10 @@ import { AutomobileComponent } from './features/automobile/automobile.component'
       provide: DOMAIN_CONFIG,
       useFactory: createAutomobileDomainConfig,
       deps: [Injector]
+    },
+    {
+      provide: ENVIRONMENT_CONFIG,
+      useValue: environment
     }
   ],
   bootstrap: [AppComponent]

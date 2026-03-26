@@ -8,14 +8,14 @@
  * - GenericUrlMapper replaces AutomobileUrlMapper
  * - GenericApiAdapter replaces AutomobileApiAdapter
  * - generateTableConfig() replaces AUTOMOBILE_TABLE_CONFIG
- * - generateFilterDefinitions() replaces AUTOMOBILE_FILTER_DEFINITIONS
+ * - generateTableFilterDefinitions() replaces AUTOMOBILE_FILTER_DEFINITIONS
  *
  * See docs/audit/refactor.md for the simplification roadmap.
  */
 
 import { Injector } from '@angular/core';
-import { DomainConfig } from '../../framework/models';
-import { ApiService } from '../../framework/services';
+import { DomainConfig } from '../../lib/config';
+import { ApiService } from '../../lib/state-management';
 import { environment } from '../../../environments/environment';
 import {
   AutoSearchFilters,
@@ -31,9 +31,7 @@ import {
 } from './configs';
 
 // Generic implementations from framework layer
-import { GenericUrlMapper } from '../../framework/adapters/generic-url-mapper';
-import { GenericApiAdapter } from '../../framework/adapters/generic-api-adapter';
-import { generateTableConfig, generateFilterDefinitions } from '../../framework/utils/config-generators';
+import { GenericUrlMapper, GenericApiAdapter, generateTableConfig, generateTableFilterDefinitions } from '../../lib/config';
 import { AUTOMOBILE_RESOURCE } from './automobile.resource';
 import {
   ManufacturerChartDataSource,
@@ -42,7 +40,7 @@ import {
   YearChartDataSource
 } from './chart-sources';
 import { Provider } from '@angular/core';
-import { DOMAIN_CONFIG } from '../../framework/services';
+import { DOMAIN_CONFIG } from '../../lib/config';
 
 /**
  * Factory function to create Automobile Domain Configuration
@@ -100,7 +98,7 @@ export function createAutomobileDomainConfig(injector: Injector): DomainConfig<
     // REFACTORED: Configs generated from AUTOMOBILE_RESOURCE
     tableConfig: generateTableConfig<VehicleResult>(AUTOMOBILE_RESOURCE),
     pickers: AUTOMOBILE_PICKER_CONFIGS,
-    filters: generateFilterDefinitions(AUTOMOBILE_RESOURCE),
+    filters: generateTableFilterDefinitions(AUTOMOBILE_RESOURCE),
   queryControlFilters: AUTOMOBILE_QUERY_CONTROL_FILTERS,
   highlightFilters: AUTOMOBILE_HIGHLIGHT_FILTERS,
   charts: AUTOMOBILE_CHART_CONFIGS,
