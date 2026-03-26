@@ -334,7 +334,7 @@ async function main(): Promise<void> {
       process.exit(1);
     }
 
-    fields = resolveMapping(properties, '', opts.exclude);
+    fields = resolveMapping(properties, '', opts.exclude, opts.dataKey);
 
     // Apply --no-filter overrides
     if (opts.noFilter && opts.noFilter.length > 0) {

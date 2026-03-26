@@ -18,6 +18,21 @@ const INTERNAL_FIELD_PATTERNS = [
   /^_/,
 ];
 
+/** Patterns that indicate a field is an ID / primary key (not useful for charts or filters) */
+const ID_FIELD_PATTERNS = [
+  /_id$/i,
+  /Id$/,
+  /^id$/i,
+  /^vin$/i,
+  /^uuid$/i,
+  /^guid$/i,
+  /_key$/i,
+  /_number$/i,
+  /^registration_number$/i,
+  /^serial_number$/i,
+  /^tracking_number$/i,
+];
+
 /**
  * Convert a dot-path ES field name to camelCase TypeScript name.
  * "location.state_province" → "locationStateProvince"
@@ -93,12 +108,23 @@ function isInternalField(dotPath: string): boolean {
 }
 
 /**
+ * Check if a field looks like an ID / primary key.
+ * These fields have high cardinality and aren't useful for charts or multiselect filters.
+ */
+function isIdField(dotPath: string, dataKey?: string): boolean {
+  const lastSegment = dotPath.split('.').pop() || dotPath;
+  if (dataKey && (dotPath === dataKey || lastSegment === dataKey)) return true;
+  return ID_FIELD_PATTERNS.some(pattern => pattern.test(lastSegment));
+}
+
+/**
  * Recursively flatten an ES mapping into resolved fields.
  */
 export function resolveMapping(
   properties: Record<string, ESFieldMapping>,
   parentPath: string = '',
-  excludeFields: string[] = []
+  excludeFields: string[] = [],
+  dataKey?: string
 ): ResolvedField[] {
   const fields: ResolvedField[] = [];
 
@@ -112,7 +138,7 @@ export function resolveMapping(
 
     // Nested object — recurse
     if (mapping.properties && !mapping.type) {
-      fields.push(...resolveMapping(mapping.properties, dotPath, excludeFields));
+      fields.push(...resolveMapping(mapping.properties, dotPath, excludeFields, dataKey));
       continue;
     }
 
@@ -123,7 +149,7 @@ export function resolveMapping(
 
     // Object type with subproperties — recurse
     if (mapping.type === 'object' && mapping.properties) {
-      fields.push(...resolveMapping(mapping.properties, dotPath, excludeFields));
+      fields.push(...resolveMapping(mapping.properties, dotPath, excludeFields, dataKey));
       continue;
     }
 
@@ -135,8 +161,10 @@ export function resolveMapping(
     const esType = (mapping.type || 'text') as ResolvedField['esType'];
     const hasKeywordSubfield = !!(mapping.fields && mapping.fields['keyword']);
     const isInternal = isInternalField(dotPath);
+    const isId = isIdField(dotPath, dataKey);
     const isNumeric = ['integer', 'long', 'float', 'double'].includes(esType);
     const isKeyword = esType === 'keyword' || hasKeywordSubfield;
+    const skip = isInternal || isId;
 
     fields.push({
       esPath: dotPath,
@@ -144,12 +172,12 @@ export function resolveMapping(
       label: toLabel(dotPath),
       esType,
       hasKeywordSubfield,
-      filterable: !isInternal && esType !== 'geo_point',
-      filterType: isInternal ? null : inferFilterType(esType, hasKeywordSubfield),
-      visible: !isInternal,
+      filterable: !skip && esType !== 'geo_point',
+      filterType: skip ? null : inferFilterType(esType, hasKeywordSubfield),
+      visible: !isInternal,  // ID fields are visible in table, just not filterable/chartable
       sortable: !isInternal && (isKeyword || isNumeric || esType === 'date'),
-      aggregable: !isInternal && (isKeyword || isNumeric),
-      highlightable: !isInternal && isKeyword,
+      aggregable: !skip && (isKeyword || isNumeric),
+      highlightable: !skip && isKeyword,
       resourceFieldType: toResourceFieldType(esType, hasKeywordSubfield),
     });
   }
